@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "AI Selection Explainer",
+  "version": "1.0.0",
+  "description": "Clear, contextual explanations of selected text using your own AI provider.",
+  "permissions": ["storage"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*", "http://[::1]/*"],
+  "background": {"service_worker": "background.js", "type": "module"},
+  "action": {"default_popup": "src/popup/index.html", "default_title": "AI Selection Explainer"},
+  "content_scripts": [{"matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_idle"}],
+  "icons": {"16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png"},
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'self'"}
+}

@@ -1,0 +1,23 @@
+:host {
+  --ase-surface: #ffffff;
+  --ase-text: #202631;
+  --ase-muted: #727b8a;
+  --ase-border: #e4e8ee;
+  --ase-accent: #5258d7;
+  --ase-error: #b33038;
+  --ase-hover: #f1f3f8;
+  --ase-shadow: 0 8px 32px #17203424, 0 2px 6px #17203412;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :host {
+    --ase-surface: #22252d;
+    --ase-text: #eff1f6;
+    --ase-muted: #a4aaba;
+    --ase-border: #3a3e49;
+    --ase-accent: #a6a9ff;
+    --ase-error: #ffb1b4;
+    --ase-hover: #333744;
+    --ase-shadow: 0 8px 32px #0005, 0 2px 6px #0003;
+  }
+}

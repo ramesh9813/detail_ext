@@ -1,0 +1,51 @@
+:host {
+  all: initial;
+  display: block;
+  position: fixed;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  width: 328px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ase-text);
+  direction: ltr;
+  text-align: left;
+  contain: layout style;
+}
+:host([hidden]) { display: none !important; }
+* { box-sizing: border-box; }
+.card {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  background: var(--ase-surface);
+  border: 1px solid var(--ase-border);
+  border-radius: 10px;
+  box-shadow: var(--ase-shadow);
+  overflow: hidden;
+}
+header { display: flex; align-items: center; gap: 7px; padding: 9px 10px 8px 14px; }
+.mark { color: var(--ase-accent); font-size: 16px; line-height: 1; }
+h2 { margin: 0; flex: 1; font-size: 12px; font-weight: 650; letter-spacing: .01em; }
+button {
+  font: inherit;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ase-muted);
+  cursor: pointer;
+  padding: 3px 6px;
+}
+button:hover { background: var(--ase-hover); color: var(--ase-text); }
+button:focus-visible { outline: 2px solid var(--ase-accent); outline-offset: 1px; }
+button:disabled { opacity: .5; cursor: default; }
+.close { font-size: 20px; line-height: 20px; min-width: 28px; min-height: 28px; }
+.body { padding: 0 14px 12px; overflow: auto; min-height: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.body.error { color: var(--ase-error); }
+.body.loading { color: var(--ase-muted); display: flex; align-items: center; gap: 8px; min-height: 52px; }
+.spinner { width: 12px; height: 12px; border: 2px solid var(--ase-border); border-top-color: var(--ase-accent); border-radius: 50%; animation: ase-spin 1s linear infinite; }
+footer { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ase-border); padding: 5px 9px 5px 14px; color: var(--ase-muted); font-size: 10px; }
+footer button { font-size: 11px; }
+@keyframes ase-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
