@@ -8,10 +8,12 @@ declare namespace chrome {
     addListener(callback: Listener): void;
     removeListener(callback: Listener): void;
     hasListener(callback: Listener): boolean;
+    hasListeners(): boolean;
   }
 
   namespace runtime {
     const id: string;
+    const lastError: { message?: string } | undefined;
     interface MessageSender {
       id?: string;
       url?: string;
@@ -30,6 +32,10 @@ declare namespace chrome {
     function sendMessage(
       message: import('./types').ExtensionMessage,
     ): Promise<import('./types').MessageResponse | undefined>;
+    function sendMessage(
+      message: import('./types').ExtensionMessage,
+      callback: (response: import('./types').MessageResponse | undefined) => void,
+    ): void;
   }
 
   namespace storage {
@@ -61,6 +67,12 @@ declare namespace chrome {
     function remove(permissions: Permissions): Promise<boolean>;
   }
 
+  namespace scripting {
+    function executeScript(options: {
+      target: { tabId: number; allFrames?: boolean };
+      files: string[];
+    }): Promise<unknown[]>;
+  }
   namespace tabs {
     interface Tab {
       id?: number;

@@ -1,5 +1,6 @@
 import type { ExtensionMessage, MessageResponse } from '../shared/types';
 import { getStatus, readSettings } from '../storage/settings-store';
+import { buildExplanationPrompt } from '../storage/prompt-store';
 import { explain } from '../providers/openai-compatible';
 import { discoverModels } from '../providers/model-discovery';
 import { isPageSender, isSettingsSender } from '../messaging/message-validation';
@@ -40,7 +41,7 @@ export async function handleMessage(
     const provider = settings.providers.find((item) => item.id === settings.activeProviderId);
     if (!provider) return { requestId, error: 'Add and select a provider in the extension settings.' };
     if (!provider.selectedModel) return { requestId, error: 'Choose a model in the extension settings.' };
-    const content = await explain(provider, selectedText, settings.customPrompt, controller.signal);
+    const content = await explain(provider, selectedText, buildExplanationPrompt(settings), controller.signal);
     return { requestId, content };
   } finally {
     requests.finish(owner, requestId);

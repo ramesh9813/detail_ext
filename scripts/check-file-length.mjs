@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-const ignored = new Set(['node_modules', 'dist', '.git', 'test-results', 'playwright-report']);
+const ignored = new Set(['node_modules', 'dist', 'release', '.git', 'test-results', 'playwright-report']);
 const failures = [];
 async function walk(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {

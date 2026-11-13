@@ -7,7 +7,7 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     rollupOptions: {
-      input: { popup: resolve(import.meta.dirname, 'src/popup/index.html'), background: resolve(import.meta.dirname, 'src/background/index.ts') },
+      input: { popup: resolve(import.meta.dirname, 'src/popup/index.html') },
       output: { entryFileNames: '[name].js', chunkFileNames: 'assets/[name]-[hash].js' },
     },
   },

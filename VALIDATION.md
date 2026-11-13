@@ -1,28 +1,29 @@
-# Delivery validation
+# Version 1.1.0 validation
 
-The application was built and exercised in Chromium on 2026-11-13. `dist/` is ready to load unpacked; it requires no Node.js or development server to run.
+The compiled extension in `dist/` runs without a development server. The ZIP is an alternative unpacked-install package. No paid provider credentials are used in automated checks.
 
 | Check | Result |
 | --- | --- |
-| Production TypeScript | Passed through `npm run build` and its strict application configuration |
-| Build | Passed; manifest worker, popup, content script, and PNG icons exist |
-| ESLint | Passed |
-| Source line limit | Passed; no source file exceeds 300 lines |
-| Built service-worker smoke checks | 16 passed; authenticated payload, safe status, privilege boundaries, discovery, HTTP errors, malformed responses, network failure, revoked access, disabled/unconfigured settings, invalid messages |
-| Actual Chromium extension integration | 1 comprehensive scenario passed; provider create/edit/delete, model choice, custom prompt, loading card, real local HTTP completion, auth header, safe plain-text response, closed Shadow DOM, light/dark themes, Escape, next selection, editable-field privacy, reopening persistence, discovery and prompt reset |
-| Browser console errors | None in the successful integration scenario |
-| Visual review | Light selection card and dark settings screenshots reviewed |
-| Full `npm install` | Blocked by environment network access (`EACCES`). Used existing local tools and genuine cached packages to build and test |
-| Full `npm run typecheck` | Blocked by missing Vitest declarations; includes tests as well as production code |
-| Vitest unit tests | Written but not executed: Vitest and its dependencies are absent locally and downloads are blocked |
-| Dependency lockfile | Not generated: offline registry metadata cannot resolve the complete development dependency tree. Run `npm install` with registry access to install dependencies and generate it |
+| Strict application TypeScript and Vite build | Passed |
+| ESLint and 300-line source limit | Passed |
+| Built service-worker smoke checks | 17 passed, including only three enabled prompts of five, safe status, authentication, permissions, errors, malformed output and network failures |
+| Chromium integration | Passed with a real local HTTP mock provider on a strict-CSP, Trusted-Types page |
+| Prompt management | Five prompts saved; three enabled; Saved notification, exclusions and persistence verified |
+| Markdown | Headings, bold, italics, lists, quotes, table and code nodes verified; dangerous links and injected HTML do not create executable elements |
+| Full content and scrolling | End-of-response sentinel retained, hidden scrollbar confirmed, real wheel scrolling verified |
+| Resizing | Actual corner drag enlarged width and height; screenshot inspected |
+| Dynamic-page behavior | Response selection works while an input retains focus; document event interception and card-host removal recovery verified |
+| Privacy | Editable input selection sends no request; credentials absent from webpage DOM |
+| Themes | Light and dark screenshots produced and visually reviewed |
+| Vitest unit suite | Added regression tests, but Vitest is unavailable locally and registry downloads are blocked |
+| Full test-inclusive typecheck | Remains blocked by missing Vitest types; application typecheck passes |
+| Dependency lockfile | Full development dependency metadata cannot be resolved offline; no fabricated lockfile supplied |
 
-The successful Chromium run used an installed Chromium executable selected through `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Its temporary extension manifest pregranted only the local mock provider host; the shipped manifest continues to use optional provider host access.
+## Manual checks remaining
 
-## Remaining verification
+1. Load `dist/` using Chrome Developer mode, reload an existing installation, and refresh webpages. Confirm version 1.1.0 in extension details.
+2. Approve the native optional provider-host permission dialog. The automated fixture pregrants only its local mock host because the native dialog has no headless UI automation.
+3. Test your actual provider and authenticated ChatGPT response selections. The live service was not automated; the retained-composer-focus behavior was reproduced locally. Chrome's protected pages cannot be bypassed.
+4. With registry access, run `npm install`, retain its generated lockfile, and run `npm run typecheck` and `npm run test`. Test touch selection and browser/service-worker restarts on your target Chrome version.
 
-1. Open `chrome://extensions`, enable Developer mode, and load `dist/` unpacked. Open the toolbar popup, add your provider, and approve Chrome's native host permission dialog. Decline it once to check the error, then save again and approve. This native dialog was not automated.
-2. With registry access, run `npm install`, `npm run typecheck`, and `npm run test`; retain the generated lockfile. Vitest tests cover cases beyond the smoke and browser scenarios, including timeout, geometry, rapid selection, copy, and cancellation.
-3. Follow the detailed manual acceptance checklist in `README.md`, especially real-provider compatibility, browser restart, service-worker interruption, viewport zoom, touch selection, and restricted pages. No real paid-provider credentials were used during validation.
-
-The current extension is functional; the unexecuted checks above mean full release acceptance is still pending.
+The earlier worker timeout is not currently reproduced. Storage initialization now retries after transient failure, messaging reports native errors without retrying paid requests, and the service worker is bundled as one standalone file without module-chunk startup dependencies. This is not a guarantee against browser or provider interruptions.

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AIProvider, ExtensionSettings } from '../shared/types';
 import { readSettings, saveSettings, subscribeSettings } from '../storage/settings-store';
-import { deleteProvider, resetPrompt, savePrompt, selectModel, selectProvider, upsertProvider } from '../storage/provider-store';
+import { deleteProvider, selectModel, selectProvider, upsertProvider } from '../storage/provider-store';
 import { sendMessage } from '../messaging/send-message';
 import { ActiveConfiguration } from './components/ActiveConfiguration';
 import { ProviderForm } from './components/ProviderForm';
 import { ProviderList } from './components/ProviderList';
-import { PromptEditor } from './components/PromptEditor';
+import { PromptManager } from './components/PromptManager';
+import { connectCurrentPage } from './connect-page';
 
 export function App() {
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
@@ -18,6 +19,7 @@ export function App() {
   const refreshVersion = useRef(0);
 
   useEffect(() => {
+    void connectCurrentPage();
     let alive = true;
     const refresh = () => { const version = ++refreshVersion.current; void readSettings().then((value) => { if (alive && version === refreshVersion.current) setSettings(value); }).catch(() => {
       if (alive) { setFailed(true); setNotice('Could not load settings. Reopen the extension to try again.'); }
@@ -27,7 +29,7 @@ export function App() {
     return () => { alive = false; unsubscribe(); };
   }, []);
 
-  function persist(transform: (current: ExtensionSettings) => ExtensionSettings, message = 'Settings saved.') {
+  function persist(transform: (current: ExtensionSettings) => ExtensionSettings, message = 'Saved') {
     const operation = writes.current.catch(() => undefined).then(async () => {
       const next = transform(await readSettings());
       await saveSettings(next);
@@ -46,7 +48,7 @@ export function App() {
     }
   }
   async function checkProvider(providerId: string, discover: boolean) {
-    setBusy(true); setFailed(false); setNotice(discover ? 'Looking for models...' : 'Testing connection...');
+    setBusy(true); setFailed(false); setNotice(discover ? 'Discovering...' : 'Testing...');
     try {
       const snapshot = (await readSettings()).providers.find((provider) => provider.id === providerId);
       if (!snapshot) throw new Error('This provider was removed.');
@@ -60,8 +62,8 @@ export function App() {
           if (!provider) throw new Error('This provider was removed.');
           if (provider.baseUrl !== snapshot.baseUrl || provider.apiKey !== snapshot.apiKey) throw new Error('The provider changed during discovery. Find models again.');
           return upsertProvider(latest, { ...provider, models: [...new Set([...provider.models, ...models])] });
-        }, `${models.length} model IDs found. Choose an active model to use it.`);
-      } else { setNotice('Connection successful. The selected model responded.'); }
+        }, `${models.length} models`);
+      } else { setNotice('Connected'); }
     } catch (cause) {
       setFailed(true); setNotice(cause instanceof Error ? cause.message : 'The provider could not be reached.');
     } finally { setBusy(false); }
@@ -69,15 +71,16 @@ export function App() {
 
   const active = settings?.providers.find((provider) => provider.id === settings.activeProviderId);
   return <main>
-    <header className="app-header"><span className="brand-icon" aria-hidden="true">&#10022;</span><div><h1>Selection Explainer</h1><p>Clarity, right where you read.</p></div><span className="version">v1.0</span></header>
+    <header className="app-header"><span className="brand-icon" aria-hidden="true">&#10022;</span><h1>Selection Explainer</h1></header>
     {notice && <p className={`notice ${failed ? 'error' : ''}`} role={failed ? 'alert' : 'status'}>{notice}</p>}
-    {!settings ? <p className="loading" role="status">Loading your settings...</p> : <>
+    {!settings ? <p className="loading" role="status">Loading...</p> : <>
+      <PromptManager settings={settings} onSave={change => persist(change, '')} />
       <ActiveConfiguration settings={settings} active={active}
         onProvider={(id) => void run(() => persist((current) => selectProvider(current, id)))}
         onModel={(model) => { if (active) void run(() => persist((current) => selectModel(current, active.id, model))); }}
-        onEnabled={(enabled) => void run(() => persist((current) => ({ ...current, enabled }), enabled ? 'Automatic explanations enabled.' : 'Automatic explanations paused.'))} />
+        onEnabled={(enabled) => void run(() => persist((current) => ({ ...current, enabled }), enabled ? 'Enabled' : 'Paused'))} />
       <section className="section">
-        <div className="section-heading"><h2>Your providers</h2>{editing === undefined && <button className="text-button" onClick={() => setEditing(null)}>+ Add provider</button>}</div>
+        <div className="section-heading"><h2>Providers</h2>{editing === undefined && <button aria-label="+ Add provider" className="text-button" onClick={() => setEditing(null)}>Add</button>}</div>
         {editing !== undefined ? <ProviderForm key={editing?.id ?? 'new'} provider={editing ?? undefined} onCancel={() => setEditing(undefined)} onSave={async (provider, preserveSavedKey) => {
           await persist((current) => {
             const saved = current.providers.find((item) => item.id === provider.id);
@@ -87,14 +90,12 @@ export function App() {
               apiKey: preserveSavedKey && saved ? saved.apiKey : provider.apiKey,
               selectedModel: saved && provider.models.includes(saved.selectedModel) ? saved.selectedModel : provider.selectedModel,
             });
-          }, 'Provider saved. Select text on a webpage to try it.'); setEditing(undefined);
+          }, 'Saved'); setEditing(undefined);
         }} /> : <ProviderList providers={settings.providers} busy={busy} onEdit={setEditing}
-          onDelete={(id) => void run(() => persist((current) => deleteProvider(current, id), 'Provider deleted.'))}
+          onDelete={(id) => void run(() => persist((current) => deleteProvider(current, id), 'Deleted'))}
           onTest={(id) => void checkProvider(id, false)} onDiscover={(id) => void checkProvider(id, true)} />}
-        <p className="hint">Connection tests send a short request and may incur provider charges. Model discovery does not test model access.</p>
       </section>
-      <PromptEditor prompt={settings.customPrompt} onSave={(prompt) => run(() => persist((current) => savePrompt(current, prompt), 'Explanation prompt saved.'))} onReset={() => run(() => persist((current) => resetPrompt(current), 'Default explanation prompt restored.'))} />
-      <footer className="privacy"><strong>Your text, your provider.</strong><p>When enabled, selected webpage text and your prompt are sent to your configured provider. Full pages and editable fields are not collected. Keys stay in local extension storage, which is not encrypted against every threat on your device. No analytics or tracking.</p><p>Works on ordinary HTTP/HTTPS pages. Chrome pages, the Web Store, and inaccessible frames are unsupported.</p></footer>
+      <details className="privacy"><summary>Privacy</summary><p>Selections and prompts go to your provider. Keys stay local and are not encrypted against every device threat. No tracking. Restricted pages are unsupported.</p></details>
     </>}
   </main>;
 }

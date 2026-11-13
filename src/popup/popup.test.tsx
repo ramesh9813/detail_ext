@@ -35,7 +35,7 @@ describe('settings popup', () => {
   it('never renders saved API keys, including in password input values', () => {
     const html = renderToStaticMarkup(<ProviderForm provider={provider} onSave={vi.fn()} onCancel={vi.fn()} />);
     expect(html).not.toContain(provider.apiKey);
-    expect(html).toContain('Replace key');
+    expect(html).toContain('Replace');
     expect(html).not.toContain('type="password"');
   });
 
@@ -67,7 +67,7 @@ describe('settings popup', () => {
   it('removes authentication only through explicit key replacement', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     await act(async () => root.render(<ProviderForm provider={provider} onSave={onSave} onCancel={vi.fn()} />));
-    const replace = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Replace key')!;
+    const replace = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Replace')!;
     expect(replace.getAttribute('aria-label')).toBe('Replace key');
     await act(async () => replace.click());
     expect(container.querySelector('input[type="password"]')?.getAttribute('aria-label')).toBe('API key');

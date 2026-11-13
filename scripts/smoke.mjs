@@ -45,7 +45,9 @@ async function check(name, action) {
 }
 const explain = () => send({ type: 'EXPLAIN_TEXT', requestId: crypto.randomUUID(), selectedText: 'Artificial General Intelligence' });
 await check('safe status excludes provider secrets', async () => {
-  assert.deepEqual(await send({ type: 'GET_SETTINGS_STATUS' }), { status: { enabled: true, configured: true } });
+  assert.deepEqual(await send({ type: 'GET_SETTINGS_STATUS' }), {
+    status: { enabled: true, configured: true, providerName: 'Local mock', model: 'mock-model' },
+  });
 });
 await check('authenticated request uses only selected text and configured prompt', async () => {
   const result = await explain();
@@ -58,6 +60,16 @@ await check('authenticated request uses only selected text and configured prompt
     model: 'mock-model', stream: false,
     messages: [{ role: 'system', content: 'Explain simply.' }, { role: 'user', content: 'Artificial General Intelligence' }],
   });
+});
+await check('only three enabled prompts of five reach the provider', async () => {
+  settings.prompts = Array.from({ length: 5 }, (_, index) => ({
+    id: String(index), name: `Task ${index}`, content: `Instruction ${index}`, enabled: index % 2 === 0,
+  }));
+  await explain();
+  const instruction = JSON.parse(calls.at(-1).options.body).messages[0].content;
+  for (const index of [0, 2, 4]) assert.ok(instruction.includes(`Instruction ${index}`));
+  for (const index of [1, 3]) assert.ok(!instruction.includes(`Instruction ${index}`));
+  delete settings.prompts;
 });
 await check('content scripts cannot discover models', async () => {
   const before = calls.length;

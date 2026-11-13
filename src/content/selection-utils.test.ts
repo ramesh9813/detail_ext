@@ -70,6 +70,51 @@ describe('privacy aware selection', () => {
     select(text);
     expect(readSelection()).toBeNull();
   });
+
+  it('allows noneditable response text when a separate composer retains focus', () => {
+    document.body.innerHTML = '<textarea aria-label="Message"></textarea><p>Readable response</p>';
+    const composer = document.querySelector('textarea')!;
+    composer.focus();
+    select(document.querySelector('p')!.firstChild!);
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(40, 60, 90, 20)] as unknown as DOMRectList);
+    expect(document.activeElement).toBe(composer);
+    expect(readSelection()?.text).toBe('Readable response');
+  });
+
+  it('recognizes editability across an open shadow root boundary', () => {
+    const editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    editor.setAttribute('contenteditable', 'true');
+    const root = editor.attachShadow({ mode: 'open' });
+    const node = document.createTextNode('Private editor contents');
+    root.append(node);
+    document.body.append(editor);
+    expect(isEditable(node)).toBe(true);
+  });
+
+  it('reads an accessible open shadow selection using its native scope', () => {
+    const host = document.createElement('div');
+    const root = host.attachShadow({ mode: 'open' });
+    const text = document.createTextNode('Shadow response');
+    root.append(text);
+    document.body.append(host);
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const scoped = { isCollapsed: false, rangeCount: 1, anchorNode: text, focusNode: text,
+      getRangeAt: () => range, toString: () => 'Shadow response' };
+    Object.defineProperty(root, 'getSelection', { value: () => scoped });
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(40, 60, 90, 20)] as unknown as DOMRectList);
+    expect(readSelection(root)?.text).toBe('Shadow response');
+  });
+
+  it('uses only the validated range text as the payload', () => {
+    const text = document.createTextNode('Allowed response');
+    document.body.append(text);
+    select(text);
+    vi.spyOn(window.getSelection()!, 'toString').mockReturnValue('Unrelated form contents');
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(40, 60, 90, 20)] as unknown as DOMRectList);
+    expect(readSelection()?.text).toBe('Allowed response');
+  });
 });
 
 describe('range positioning', () => {

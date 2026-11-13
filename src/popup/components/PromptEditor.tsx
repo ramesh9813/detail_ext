@@ -10,10 +10,9 @@ export function PromptEditor({ prompt, onSave, onReset }: Props) {
     try { await action(); } finally { setBusy(false); }
   }
   return <section className="section">
-    <h2>Custom Explanation Prompt</h2>
-    <p className="hint">Customize how AI explains selected text.</p>
+    <h2>Prompt</h2>
     <label className="sr-only" htmlFor="prompt">Custom Explanation Prompt</label>
-    <textarea id="prompt" rows={5} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Leave empty to use the default explanation prompt." />
-    <div className="actions"><button disabled={busy} onClick={() => void run(() => onSave(draft))}>Save prompt</button><button className="text-button" disabled={busy} onClick={() => void run(onReset)}>Reset to default</button></div>
+    <textarea id="prompt" rows={3} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Default" />
+    <div className="actions"><button aria-label="Save prompt" disabled={busy} onClick={() => void run(() => onSave(draft))}>Save</button><button aria-label="Reset to default" className="text-button" disabled={busy} onClick={() => void run(onReset)}>Reset</button></div>
   </section>;
 }

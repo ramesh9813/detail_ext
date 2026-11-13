@@ -40,17 +40,15 @@ export function ProviderForm({ provider, onSave, onCancel }: Props) {
   }
 
   return <form className="provider-form" onSubmit={save}>
-    <h3>{provider ? 'Edit provider' : 'Add your provider'}</h3>
-    <label>Provider name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="My AI provider" maxLength={100} /></label>
-    <label>API base URL<input type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.example.com/v1" spellCheck={false} /></label>
-    <p className="hint">Use the API root, usually ending in /v1. HTTP is allowed only for loopback servers.</p>
-    <label>API key <span className="optional">required if your provider uses authentication</span>
-      {replaceKey ? <input aria-label="API key" type="password" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Enter key, or leave empty for no authentication" autoComplete="new-password" spellCheck={false} /> : <span className="saved-key"><span>Key saved in this extension</span><button type="button" aria-label="Replace key" className="text-button" onClick={() => setReplaceKey(true)}>Replace key</button></span>}
+    <h3>{provider ? 'Edit' : 'Add'}</h3>
+    <label>Name<input aria-label="Provider name" autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" maxLength={100} /></label>
+    <label>Endpoint<input aria-label="API base URL" title="API root, usually ending in /v1. HTTP is limited to loopback servers." type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.example.com/v1" spellCheck={false} /></label>
+    <label>Key
+      {replaceKey ? <input aria-label="API key" title="Optional for providers without authentication." type="password" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Key" autoComplete="new-password" spellCheck={false} /> : <span className="saved-key"><span>Saved</span><button type="button" aria-label="Replace key" className="text-button" onClick={() => setReplaceKey(true)}>Replace</button></span>}
     </label>
-    {provider?.apiKey && replaceKey && <p className="hint">An empty replacement removes authentication. <button type="button" aria-label="Keep saved key" className="text-button" onClick={() => { setReplaceKey(false); setKey(''); }}>Keep saved key</button></p>}
-    <label>Model IDs<textarea rows={2} value={models} onChange={(event) => setModels(event.target.value)} placeholder="model-id, another-model-id" spellCheck={false} /></label>
-    <p className="hint">Separate model IDs with commas. You can discover models after saving.</p>
+    {provider?.apiKey && replaceKey && <button type="button" aria-label="Keep saved key" className="text-button" onClick={() => { setReplaceKey(false); setKey(''); }}>Keep</button>}
+    <label>Models<textarea aria-label="Model IDs" title="Comma-separated model IDs." rows={2} value={models} onChange={(event) => setModels(event.target.value)} placeholder="model-id" spellCheck={false} /></label>
     {error && <p className="error" role="alert">{error}</p>}
-    <div className="actions"><button type="submit" className="primary" disabled={saving}>{saving ? 'Saving...' : 'Save provider'}</button><button type="button" onClick={onCancel} disabled={saving}>Cancel</button></div>
+    <div className="actions"><button aria-label="Save provider" type="submit" className="primary" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button><button type="button" onClick={onCancel} disabled={saving}>Cancel</button></div>
   </form>;
 }

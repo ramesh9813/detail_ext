@@ -47,6 +47,7 @@ describe('background flow', () => {
 
   it('explains using stored provider and prompt and sends no credentials back', async () => {
     configure(); settings.customPrompt = 'Explain simply.';
+    settings.prompts = [{ id: 'simple', name: 'Simple', content: 'Explain simply.', enabled: true }];
     const result = await handleMessage({ type: 'EXPLAIN_TEXT', requestId: 'success', selectedText: 'hello' }, page);
     expect(mocks.explain).toHaveBeenCalledWith(settings.providers[0], 'hello', 'Explain simply.', expect.any(AbortSignal));
     expect(result).toEqual({ requestId: 'success', content: 'A clear explanation.' });

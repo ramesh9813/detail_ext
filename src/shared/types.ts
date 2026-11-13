@@ -6,10 +6,17 @@ export interface AIProvider {
   models: string[];
   selectedModel: string;
 }
+export interface CustomPrompt {
+  id: string;
+  name: string;
+  content: string;
+  enabled: boolean;
+}
 export interface ExtensionSettings {
   providers: AIProvider[];
   activeProviderId: string | null;
   customPrompt: string;
+  prompts: CustomPrompt[];
   enabled: boolean;
 }
 export interface SettingsStatus {

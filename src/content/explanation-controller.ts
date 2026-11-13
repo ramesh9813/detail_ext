@@ -3,22 +3,22 @@ import { sendMessage } from '../messaging/send-message';
 import type { SettingsStatus } from '../shared/types';
 import { selectionAnchor } from './selection-anchor';
 import { listenForSelections } from './selection-listener';
+import { recoverCardHost } from './host-recovery';
 import { readSelection, sameSelection, type TextSelection } from './selection-utils';
 
 export function startExplanationController(): () => void {
-  let status: SettingsStatus = { enabled: false, configured: false };
+  let status: SettingsStatus | null = null;
   let active: TextSelection | null = null;
   let requestId: string | null = null;
   let location = window.location.href;
-  let generation = 0;
   let frame = 0;
   let destroyed = false;
   const card = createExplanationCard(dismiss);
+  const removeHostRecovery = card.host ? recoverCardHost(card.host) : () => {};
   const navigation = 'navigation' in window && window.navigation instanceof EventTarget
     ? window.navigation : null;
 
   function dismiss() {
-    generation++;
     if (requestId) void sendMessage({ type: 'CANCEL_EXPLANATION', requestId });
     requestId = null;
     active = null;
@@ -27,21 +27,20 @@ export function startExplanationController(): () => void {
 
   function applyStatus(next: SettingsStatus) {
     status = next;
-    if (!status.enabled || !status.configured) dismiss();
+    card.setProvider(next.providerName, next.model);
+    if (!next.enabled) dismiss();
   }
 
   async function refreshStatus() {
     const response = await sendMessage({ type: 'GET_SETTINGS_STATUS' });
-    if (!destroyed) applyStatus(response.status ?? { enabled: false, configured: false });
+    if (!destroyed && response.status) applyStatus(response.status);
   }
 
-  const ready = refreshStatus();
+  void refreshStatus();
 
-  async function complete() {
-    const eventGeneration = generation;
-    await ready;
-    if (destroyed || eventGeneration !== generation || !status.enabled || !status.configured) return;
-    const next = readSelection();
+  async function complete(scope?: ShadowRoot) {
+    if (destroyed) return;
+    const next = readSelection(scope);
     if (!next) return;
     if (active && sameSelection(active, next)) return;
     dismiss();
@@ -49,7 +48,22 @@ export function startExplanationController(): () => void {
     location = window.location.href;
     const id = crypto.randomUUID();
     requestId = id;
+    if (card.host && !card.host.isConnected) document.documentElement.append(card.host);
     card.show(next.anchor);
+    card.setProvider(status?.providerName, status?.model);
+    // Render first; recheck settings so a failed startup lookup cannot silently disable selection.
+    const current = await sendMessage({ type: 'GET_SETTINGS_STATUS' });
+    if (destroyed || requestId !== id) return;
+    if (!current.status) {
+      card.setError(current.error ?? 'Could not read settings. Reopen the extension and try again.');
+      return;
+    }
+    applyStatus(current.status);
+    if (!current.status.enabled) return;
+    if (!current.status.configured) {
+      card.setError('Choose a provider and model in extension settings.');
+      return;
+    }
     const result = await sendMessage({ type: 'EXPLAIN_TEXT', requestId: id, selectedText: next.text });
     if (destroyed || requestId !== id) return;
     if (window.location.href !== location) { dismiss(); return; }
@@ -80,7 +94,7 @@ export function startExplanationController(): () => void {
     void refreshStatus();
   }
 
-  const removeSelections = listenForSelections(() => void complete(), dismiss, card.contains);
+  const removeSelections = listenForSelections(scope => void complete(scope), dismiss, card.contains);
   window.addEventListener('focus', refreshStatus);
   window.addEventListener('scroll', reposition, { capture: true, passive: true });
   window.addEventListener('resize', reposition, { passive: true });
@@ -95,6 +109,7 @@ export function startExplanationController(): () => void {
     destroyed = true;
     dismiss();
     removeSelections();
+    removeHostRecovery();
     cancelAnimationFrame(frame);
     window.removeEventListener('focus', refreshStatus);
     window.removeEventListener('scroll', reposition, true);

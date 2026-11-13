@@ -1,11 +1,21 @@
 import { defaultSettings } from './defaults';
+import { normalizePrompts } from './prompt-store';
 import type { AIProvider, ExtensionSettings, SettingsStatus } from '../shared/types';
 
 const SETTINGS_KEY = 'settings';
+const accessInitialization = new WeakMap<chrome.storage.StorageArea, Promise<void>>();
 
 /** Content scripts cannot read the API keys held by this storage area. */
-export async function initializeStorage(): Promise<void> {
-  await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+export function initializeStorage(): Promise<void> {
+  const area = chrome.storage.local;
+  const pending = accessInitialization.get(area);
+  if (pending) return pending;
+  const initialized = Promise.resolve().then(() => area.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }));
+  accessInitialization.set(area, initialized);
+  void initialized.catch(() => {
+    if (accessInitialization.get(area) === initialized) accessInitialization.delete(area);
+  });
+  return initialized;
 }
 
 function isProvider(value: unknown): value is AIProvider {
@@ -29,6 +39,9 @@ export function normalizeSettings(value: unknown): ExtensionSettings {
   return {
     providers,
     activeProviderId,
+    prompts: normalizePrompts(settings.prompts,
+      typeof settings.customPrompt === 'string' && settings.customPrompt.trim()
+        ? settings.customPrompt : defaults.customPrompt),
     customPrompt: typeof settings.customPrompt === 'string' && settings.customPrompt.trim()
       ? settings.customPrompt : defaults.customPrompt,
     enabled: typeof settings.enabled === 'boolean' ? settings.enabled : defaults.enabled,
@@ -59,4 +72,6 @@ export function subscribeSettings(listener: () => void): () => void {
   const onChange = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
     if (area === 'local' && SETTINGS_KEY in changes) listener();
   };
-  chrome.storage.onChanged.a
+  chrome.storage.onChanged.addListener(onChange);
+  return () => chrome.storage.onChanged.removeListener(onChange);
+}

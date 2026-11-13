@@ -39,7 +39,7 @@ describe('protected local settings', () => {
         models: ['model'], selectedModel: 'model',
       }],
     });
-    expect(await getStatus()).toEqual({ enabled: true, configured: true });
+    expect(await getStatus()).toEqual({ enabled: true, configured: true, providerName: 'Provider', model: 'model' });
   });
   it('notifies for local settings changes only and removes the listener', () => {
     const callback = vi.fn();

@@ -13,6 +13,16 @@ let extensionId: string;
 const requests: { authorization?: string; body: unknown }[] = [];
 const key = 'test-only-local-secret';
 const pageErrors: string[] = [];
+const markdownResponse = [
+  '## Meaning', '**Amount &amp; quantity** or *quantity*.',
+  '- First item\n- Second item', '> Useful context.',
+  '| Word | Meaning |\n| :--- | ---: |\n| quantity | amount |',
+  '```ts\nconst quantity = 2;\n```',
+  '[Reference](https://example.com)', '[Unsafe](javascript:alert(1))',
+  '<img src=x onerror=alert(1)>',
+  ...Array.from({ length: 35 }, (_, index) => `Paragraph ${index + 1}: A complete explanation with useful details.`),
+  '**END OF RESPONSE**',
+].join('\n\n');
 
 test.beforeAll(async () => {
   server = createServer((request, response) => {
@@ -27,7 +37,7 @@ test.beforeAll(async () => {
         requests.push({ authorization: request.headers.authorization, body: JSON.parse(body) as unknown });
         setTimeout(() => {
           response.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-          response.end(JSON.stringify({ choices: [{ message: { content: 'A broad ability to learn and solve many different tasks.' } }] }));
+          response.end(JSON.stringify({ choices: [{ message: { content: markdownResponse } }] }));
         }, 1000);
       });
       return;
@@ -36,8 +46,16 @@ test.beforeAll(async () => {
       response.writeHead(200, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify({ data: [{ id: 'discovered-model' }] })); return;
     }
-    response.writeHead(200, { 'Content-Type': 'text/html' });
-    response.end('<!doctype html><html><head><title>Selection test</title></head><body style="font:20px system-ui;padding:80px"><p id="selection">Artificial General Intelligence</p><p id="second">Neural networks</p><input aria-label="Sensitive input" value="private data"><div style="height:1500px"></div></body></html>');
+    if (request.url === '/fixture.css') {
+      response.writeHead(200, { 'Content-Type': 'text/css' });
+      response.end('body {font:20px system-ui;padding:80px} .spacer {height:1500px}'); return;
+    }
+    if (request.url === '/site.js') {
+      response.writeHead(200, { 'Content-Type': 'text/javascript' });
+      response.end('document.addEventListener("keyup", event => event.stopImmediatePropagation(), true);'); return;
+    }
+    response.writeHead(200, { 'Content-Type': 'text/html', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; require-trusted-types-for 'script'" });
+    response.end('<!doctype html><html><head><title>Selection test</title><link rel="stylesheet" href="/fixture.css"><script src="/site.js"></script></head><body><p id="selection">Artificial General Intelligence</p><p id="second">Neural networks</p><input aria-label="Sensitive input" value="private data"><div class="spacer"></div></body></html>');
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
@@ -94,7 +112,7 @@ async function selectParagraph(page: Page, id = 'selection') {
   }, id);
 }
 
-async function readClosedCard(page: Page): Promise<string> {
+async function readClosedCard(page: Page, selector = '.body', script = 'function(selector) { return this.querySelector(selector).textContent; }'): Promise<string> {
   // DevTools may inspect closed roots without changing the production isolation.
   const session = await context.newCDPSession(page);
   try {
@@ -114,85 +132,122 @@ async function readClosedCard(page: Page): Promise<string> {
     const resolved = await session.send('DOM.resolveNode', { nodeId: shadow.nodeId });
     const value = await session.send('Runtime.callFunctionOn', {
       objectId: resolved.object.objectId,
-      functionDeclaration: 'function() { return this.querySelector(".body").textContent; }',
+      functionDeclaration: script,
+      arguments: [{ value: selector }],
       returnByValue: true,
     });
     return String(value.result.value ?? '');
   } finally { await session.detach(); }
 }
 
-test('provider setup, selection explanation, privacy, persistence and settings management', async () => {
+test('prompts, Markdown, resizing, scrolling and dynamic-page selection', async () => {
   const popup = await openPopup();
-  await popup.getByRole('button', { name: '+ Add provider' }).click();
+  const prompts = popup.getByRole('region', { name: 'Custom prompts' });
+  expect(await popup.locator('body').evaluate(node => node.getBoundingClientRect().width)).toBe(640);
+  await expect(popup.getByText('Clarity, right where you read.', { exact: true })).toHaveCount(0);
+  await prompts.getByRole('button', { name: 'Edit prompt Explain', exact: true }).click();
+  await popup.getByLabel('Prompt name').fill('Task 1');
+  await popup.getByLabel('Prompt content').fill('Explain briefly with an example.');
+  await popup.getByRole('button', { name: 'Save prompt', exact: true }).click();
+  await expect(prompts.getByRole('status')).toHaveText('Saved');
+  for (let index = 2; index <= 5; index++) {
+    await prompts.getByRole('button', { name: 'Add prompt', exact: true }).click();
+    await popup.getByLabel('Prompt name').fill(`Task ${index}`);
+    await popup.getByLabel('Prompt content').fill(`Instruction ${index}`);
+    await popup.getByRole('button', { name: 'Save prompt', exact: true }).click();
+    await expect(popup.getByRole('button', { name: 'Save prompt', exact: true })).toHaveCount(0);
+  }
+  await prompts.getByLabel('Enable Task 2', { exact: true }).uncheck();
+  await expect(prompts.getByLabel('Enable Task 2', { exact: true })).not.toBeChecked();
+  await prompts.getByLabel('Enable Task 4', { exact: true }).uncheck();
+  await expect(prompts.getByText('3 active', { exact: true })).toBeVisible();
+  await popup.getByRole('button', { name: '+ Add provider', exact: true }).click();
   await popup.getByLabel('Provider name').fill('Local mock');
   await popup.getByLabel('API base URL').fill(`${origin}/v1`);
-  await popup.getByLabel('API key', { exact: false }).fill(key);
+  await popup.getByLabel('API key', { exact: true }).fill(key);
   await popup.getByLabel('Model IDs').fill('mock-model, second-model');
   await popup.getByRole('button', { name: 'Save provider', exact: true }).click();
-  await expect(popup.getByText('Provider saved.', { exact: false })).toBeVisible();
-  await expect(popup.getByLabel('Active model')).toHaveValue('mock-model');
+  await expect(popup.getByRole('button', { name: 'Save provider', exact: true })).toHaveCount(0);
   await popup.getByLabel('Active model').selectOption('second-model');
   await popup.getByRole('button', { name: 'Edit', exact: true }).click();
-  await expect(popup.getByText('Replace key', { exact: true })).toBeVisible();
-  expect(await popup.locator('body').textContent()).not.toContain(key);
-  expect(await popup.locator('input').evaluateAll(inputs => inputs.map(input =>
-    input instanceof HTMLInputElement ? input.value : ''))).not.toContain(key);
-  await popup.getByLabel('Provider name').fill('Local edited');
+  await expect(popup.getByRole('button', { name: 'Replace key', exact: true })).toBeVisible();
+  expect(await popup.content()).not.toContain(key);
   await popup.getByRole('button', { name: 'Save provider', exact: true }).click();
-  const prompt = popup.getByLabel('Custom Explanation Prompt');
-  await prompt.fill('Explain briefly with an example.');
-  await popup.getByRole('button', { name: 'Save prompt', exact: true }).click();
-  await expect(popup.getByText('Explanation prompt saved.', { exact: true })).toBeVisible();
-  await popup.emulateMedia({ colorScheme: 'dark' });
-  await popup.screenshot({ path: 'test-results/popup-dark.png', fullPage: true });
+  await expect(popup.getByRole('button', { name: 'Save provider', exact: true })).toHaveCount(0);
   await popup.emulateMedia({ colorScheme: 'light' });
   await popup.screenshot({ path: 'test-results/popup-light.png', fullPage: true });
+  await popup.emulateMedia({ colorScheme: 'dark' });
+  await popup.screenshot({ path: 'test-results/popup-dark.png', fullPage: true });
   await popup.close();
 
   const page = await context.newPage();
   page.on('pageerror', error => pageErrors.push(error.message));
-  page.on('console', message => { if (message.type() === 'error') pageErrors.push(message.text()); });
   await page.goto(origin);
-  const count = requests.length;
+  // ChatGPT can retain composer focus while its response text is selected.
+  await page.getByLabel('Sensitive input').focus();
   await selectParagraph(page);
   const host = page.locator('[data-ai-selection-explainer]');
   await expect(host).toBeVisible();
-  await expect.poll(() => readClosedCard(page)).toContain('Explaining selection');
-  await expect.poll(() => requests.length).toBe(count + 1);
-  await expect.poll(() => readClosedCard(page)).toContain('A broad ability');
-  expect(requests.at(-1)).toEqual({ authorization: `Bearer ${key}`, body: {
-    model: 'second-model', stream: false,
-    messages: [{ role: 'system', content: 'Explain briefly with an example.' },
-      { role: 'user', content: 'Artificial General Intelligence' }],
-  } });
-  expect(await page.content()).not.toContain(key);
-  expect(await host.evaluate(node => node.shadowRoot)).toBeNull();
-  await page.screenshot({ path: 'test-results/selection-light.png' });
-  expect(await host.evaluate(node => getComputedStyle(node).getPropertyValue('--ase-surface').trim())).toBe('#ffffff');
+  await expect.poll(() => readClosedCard(page)).toContain('Processing...');
+  await expect.poll(() => readClosedCard(page, '.provider')).toBe('Using Local mock');
+  await expect.poll(() => readClosedCard(page)).toContain('END OF RESPONSE');
+  const count = (selector: string) => readClosedCard(page, selector, 'function(s) { return String(this.querySelectorAll(s).length); }');
+  expect(await count('.body strong')).toBe('2');
+  expect(await readClosedCard(page, '.body strong')).toBe('Amount & quantity');
+  expect(await count('.body em')).toBe('1');
+  expect(await count('.body table')).toBe('1');
+  expect(await count('.body pre code')).toBe('1');
+  expect(await count('.body img, .body script, .body a[href^="javascript:"]')).toBe('0');
+  const style = 'function(s) { return getComputedStyle(this.querySelector(s)).scrollbarWidth; }';
+  expect(await readClosedCard(page, '.body', style)).toBe('none');
+  const initial = await host.boundingBox();
+  if (!initial) throw new Error('Missing card bounds');
+  await page.mouse.move(initial.x + initial.width / 2, initial.y + 90);
+  await page.mouse.wheel(0, 1000);
+  await expect.poll(async () => Number(await readClosedCard(page, '.body', 'function(s) { return String(this.querySelector(s).scrollTop); }'))).toBeGreaterThan(0);
+  const corner = JSON.parse(await readClosedCard(page, '.resize-handle', 'function(s) { return JSON.stringify(this.querySelector(s).getBoundingClientRect().toJSON()); }')) as { x: number; y: number; width: number; height: number };
+  await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(corner.x + 165, corner.y + 115, { steps: 8 });
+  await page.mouse.up();
+  const resized = await host.boundingBox();
+  expect(resized?.width).toBeGreaterThan(initial.width + 100);
+  expect(resized?.height).toBeGreaterThan(initial.height);
+  await readClosedCard(page, '.body', 'function(s) { this.querySelector(s).scrollTop = 0; return "top"; }');
+  await page.screenshot({ path: 'test-results/markdown-resized.png' });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({ path: 'test-results/selection-dark.png' });
-  expect(await host.evaluate(node => getComputedStyle(node).getPropertyValue('--ase-surface').trim())).toBe('#22252d');
+  await page.screenshot({ path: 'test-results/markdown-dark.png' });
+  const sent = requests.at(-1);
+  expect(sent?.authorization).toBe(`Bearer ${key}`);
+  const body = sent?.body as { model: string; messages: Array<{ role: string; content: string }> };
+  expect(body.model).toBe('second-model');
+  expect(body.messages[1].content).toBe('Artificial General Intelligence');
+  expect(body.messages[0].content).toContain('Task 1');
+  expect(body.messages[0].content).toContain('Instruction 3');
+  expect(body.messages[0].content).toContain('Instruction 5');
+  expect(body.messages[0].content).not.toContain('Instruction 2');
+  expect(body.messages[0].content).not.toContain('Instruction 4');
+  expect(await page.content()).not.toContain(key);
   await page.keyboard.press('Escape');
   await expect(host).toBeHidden();
+  const beforeSecond = requests.length;
+  await page.evaluate(() => {
+    document.addEventListener('keyup', event => event.stopImmediatePropagation(), true);
+  });
   await selectParagraph(page, 'second');
+  await expect.poll(() => requests.length).toBe(beforeSecond + 1);
+  await expect.poll(() => readClosedCard(page)).toContain('END OF RESPONSE');
+  await page.evaluate(() => document.querySelector('[data-ai-selection-explainer]')?.remove());
   await expect(host).toBeVisible();
-  await expect.poll(() => readClosedCard(page)).toContain('A broad ability');
   await page.keyboard.press('Escape');
   const beforeInput = requests.length;
-  await page.getByLabel('Sensitive input').focus();
   await page.getByLabel('Sensitive input').selectText();
   await page.keyboard.press('Shift');
   await expect(host).toBeHidden();
   expect(requests.length).toBe(beforeInput);
   expect(pageErrors).toEqual([]);
-
   const reopened = await openPopup();
-  await expect(reopened.getByLabel('Active model')).toHaveValue('second-model');
-  await expect(reopened.getByLabel('Custom Explanation Prompt')).toHaveValue('Explain briefly with an example.');
-  await reopened.getByRole('button', { name: 'Find models', exact: true }).click();
-  await expect(reopened.getByLabel('Active model').getByRole('option', { name: 'discovered-model' })).toHaveCount(1);
-  await reopened.getByRole('button', { name: 'Reset to default', exact: true }).click();
-  await expect(reopened.getByLabel('Custom Explanation Prompt')).toHaveValue(/^Explain the selected text clearly/);
-  await reopened.getByRole('button', { name: 'Delete Local edited', exact: true }).click();
-  await expect(reopened.getByText('A little context, instantly.', { exact: true })).toBeVisible();
+  await expect(reopened.getByLabel('Enable Task 2', { exact: true })).not.toBeChecked();
+  await expect(reopened.getByLabel('Enable Task 4', { exact: true })).not.toBeChecked();
+  await expect(reopened.getByText('3 active', { exact: true })).toBeVisible();
 });

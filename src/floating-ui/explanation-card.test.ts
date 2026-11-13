@@ -29,7 +29,7 @@ describe('explanation card', () => {
   it('shows an immediate accessible loading state', () => {
     card.show(anchor());
     expect(card.host.hidden).toBe(false);
-    expect(shadow.querySelector('.body')?.textContent).toContain('Explaining selection');
+    expect(shadow.querySelector('.body')?.textContent).toContain('Processing...');
     expect(shadow.querySelector('.body')?.getAttribute('aria-busy')).toBe('true');
   });
   it('renders provider response as literal text', () => {
@@ -37,6 +37,13 @@ describe('explanation card', () => {
     card.setContent('<img src=x onerror=alert(1)>');
     expect(shadow.querySelector('img')).toBeNull();
     expect(shadow.querySelector('.body')?.textContent).toBe('<img src=x onerror=alert(1)>');
+  });
+  it('shows the active provider with minimal card text', () => {
+    card.setProvider('My provider', 'model-id');
+    card.show(anchor());
+    expect(shadow.querySelector('.provider')?.textContent).toBe('Using My provider');
+    expect(shadow.querySelector('.provider')?.getAttribute('title')).toBe('My provider / model-id');
+    expect(shadow.querySelector('.body')?.textContent).toBe('Processing...');
   });
   it('displays an error and disables copying', () => {
     card.show(anchor());
@@ -52,6 +59,17 @@ describe('explanation card', () => {
     await Promise.resolve();
     expect(writeText).toHaveBeenCalledWith('A clear explanation.');
     expect(shadow.querySelector('footer button')?.textContent).toBe('Copied');
+  });
+  it('renders Markdown and copies the complete original Markdown', async () => {
+    const source = '**Bold** and *italic*\n\n- First\n- Last';
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    card.show(anchor(), source);
+    expect(shadow.querySelector('strong')?.textContent).toBe('Bold');
+    expect(shadow.querySelectorAll('li')).toHaveLength(2);
+    shadow.querySelector<HTMLButtonElement>('footer button')?.click();
+    await Promise.resolve();
+    expect(writeText).toHaveBeenCalledWith(source);
   });
   it('dismisses on Escape but programmatic hide has no callback', () => {
     card.show(anchor());

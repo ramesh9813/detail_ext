@@ -3,13 +3,13 @@ import { isExtensionMessage, isTrustedSender } from '../messaging/message-valida
 import { handleMessage, requests } from './message-handler';
 import type { MessageResponse } from '../shared/types';
 
-const ready = initializeStorage();
-// Attach a rejection handler immediately; individual requests still fail closed below.
-void ready.catch(() => undefined);
+// Start protection promptly. Each storage operation also awaits the same protected
+// initialization; a failed startup attempt must not permanently reject all messages.
+void initializeStorage().catch(() => undefined);
 
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (!isTrustedSender(sender) || !isExtensionMessage(message)) return false;
-  void ready.then(() => handleMessage(message, sender)).then(sendResponse).catch((error: unknown) => {
+  void Promise.resolve().then(() => handleMessage(message, sender)).then(sendResponse).catch((error: unknown) => {
     const response: MessageResponse = {
       error: error instanceof Error ? error.message : 'The explanation could not be completed.',
     };

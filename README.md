@@ -20,29 +20,43 @@ The compiled extension runs without Vite or any development server. After rebuil
 
 ## Configure a provider
 
-1. Open the toolbar popup and choose **Add provider**.
+1. Open the toolbar popup and choose **Add**.
 2. Enter a display name and your provider's API root, such as `https://api.example.com/v1`.
 3. Enter the API key required by your provider. Leave it empty only if that provider accepts unauthenticated requests, as some local servers do.
 4. Enter one or more model IDs, separated by commas. Model IDs must match the provider's identifiers exactly.
 5. Save the provider and approve Chrome's request for access to that provider host.
 6. Select the active provider and model. Keep automatic explanations enabled.
-7. Optionally use **Find models** to request `/models`. A discovered ID does not guarantee your account can use it; manual model IDs remain supported when discovery is unavailable.
-8. Use **Test connection** to check the active configuration. This sends a small generation request and may incur a provider charge.
-9. Edit and save **Custom Explanation Prompt** to replace the default instruction. Reset restores the built-in instruction; an empty prompt falls back to that default.
+7. Optionally use **Discover** to request `/models`. A discovered ID does not guarantee your account can use it; manual model IDs remain supported when discovery is unavailable.
+8. Use **Test** to check the active configuration. This sends a small generation request and may incur a provider charge.
+9. Manage instructions in **Prompts** at the top of the popup. Add a name and instruction, then press **Save**. A **Saved** notification confirms persistence. Check the prompts you want applied to each selection; uncheck the others.
 
 The API root must not include `/chat/completions`, `/models`, embedded credentials, query parameters, or a fragment. Remote providers require HTTPS. HTTP is accepted only for explicit loopback endpoints such as `http://localhost:1234/v1` or `http://127.0.0.1:8080/v1`. The local server must already be running and implement the compatible API.
 
 Saving an edited provider requests host access for its current destination. If access is declined or later revoked, authenticated requests cannot proceed until access is restored in settings. Chrome host permissions cover the provider host rather than one exact port or API path. Removing a provider removes its configuration; inspect the extension's Chrome permissions to revoke previously granted host access.
 
-Saved keys are masked when the provider form is reopened. Choose **Replace key** to provide a new key; an empty replacement removes authentication. The saved complete key is not displayed in the form.
+Saved keys are masked when the provider form is reopened. Choose **Replace** to provide a new key; an empty replacement removes authentication. The saved complete key is not displayed in the form.
 
 ## Use the extension
 
 Visit an ordinary HTTP/HTTPS webpage and select a word, sentence, or paragraph, for example **Artificial General Intelligence**. Finish the selection by releasing the pointer or completing a keyboard selection. No additional Explain button or shortcut is needed.
 
-The card shows a loading indicator promptly after selection completes. Answers render as plain text with preserved line breaks, without interpreting HTML. Use the close button, Escape, or click outside to dismiss it. Use **Copy** to copy a successful response. Selecting new text replaces the current explanation; a stale response cannot overwrite the latest selection.
+The card shows a loading indicator promptly after selection completes. Answers render as styled Markdown: headings, bold, italics, lists, quotes, code, links, and tables. Raw HTML stays inert; remote images are represented by their descriptions instead of being fetched. The full response is retained. Use the close button, Escape, or click outside to dismiss it. Use **Copy** to copy a successful response. Selecting new text replaces the current explanation; a stale response cannot overwrite the latest selection.
 
-The interface follows the operating system's light or dark preference automatically. Long answers scroll inside the card. Disable automatic explanations from the toolbar popup when you do not want selections sent to your provider.
+The interface follows the operating system's light or dark preference automatically. Long answers scroll inside the card with hidden scrollbars. Use the mouse wheel, touch scrolling, or focus the content and use keyboard scrolling. Tables and code blocks can scroll horizontally. Drag the bottom-right corner to resize the card, or focus its handle and use arrow keys. Resizing stays within the viewport. Disable automatic explanations from the toolbar popup when you do not want selections sent to your provider.
+
+The settings popup is 640px wide. The explanation card starts at 400px wide and can be enlarged and shows **Processing...** with a spinner immediately, then the response. Its footer shows **Using [provider]**; hover over that label to see the model. Missing setup and connection failures show visible feedback instead of silently ignoring the selection. After loading an updated extension, reload it in `chrome://extensions` and refresh the webpage once so it receives the new content script.
+
+## Multiple prompts
+
+Prompts appear above provider settings. Each has an enable checkbox, Edit, and Delete. You can keep five prompts saved and enable any three. Enabled prompts run together in one request; multiple instructions are placed in separate named tasks, asking the model to return a section for each. Disabled prompts are not sent. With no prompt enabled, the built-in explanation instruction is used. Existing single-prompt settings migrate automatically without changing their text.
+
+Prompt saves and checkbox changes persist locally. The visible **Saved** notification confirms completion. Provider/model changes and prompt edits are applied to subsequent selections.
+
+## Dynamic pages
+
+Response selections on ChatGPT-style pages are supported even if the composer retains focus. Selecting inside an input, password field, or editable composer is deliberately excluded. Window capture listeners and a selection-change fallback handle sites that intercept events or update selection late; SPA card removal is recovered automatically.
+
+Opening the toolbar popup can reconnect the content script to the current ordinary webpage using temporary active-tab permission. After updating, reload the extension and refresh existing webpages once. This does not bypass Chrome restrictions: internal pages, the Web Store, and inaccessible frames remain unsupported. Authenticated ChatGPT itself was not exercised during automated validation; its focused-composer behavior was reproduced in a local browser fixture.
 
 ## Privacy and security
 
@@ -138,5 +152,7 @@ Perform these checks in Chrome after building and loading `dist`. Use a developm
 - API keys are optional because some compatible local providers do not require them. A remote provider that requires a key reports its authentication failure when tested or called.
 - Provider-side cost, output quality, response time, context limits, availability, and data retention are controlled by the configured provider.
 
-If an explanation fails, first check that the extension is enabled, the intended provider and model are selected, host access is granted, and the API root is correct. Use **Test connection**, read its message, and consult your provider's model and authentication documentation. Never paste your API key into a bug report.
+If an explanation fails, first check that the extension is enabled, the intended provider and model are selected, host access is granted, and the API root is correct. Use **Test**, read its message, and consult your provider's model and authentication documentation. Never paste your API key into a bug report.
 "# detail_ext" 
+
+Markdown uses the MIT-licensed Marked library, bundled locally. See `dist/THIRD_PARTY_NOTICES.txt`. Common Markdown is supported; LaTeX and embedded executable HTML are not rendered.

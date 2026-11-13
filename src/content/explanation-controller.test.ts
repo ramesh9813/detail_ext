@@ -6,12 +6,12 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(), read: vi.fn(),
   card: {
     show: vi.fn(), hide: vi.fn(), destroy: vi.fn(), reposition: vi.fn(),
-    setContent: vi.fn(), setError: vi.fn(), contains: () => false,
+    setContent: vi.fn(), setError: vi.fn(), setProvider: vi.fn(), contains: () => false,
   },
 }));
 vi.mock('../messaging/send-message', () => ({ sendMessage: mocks.send }));
 vi.mock('../floating-ui/explanation-card', () => ({ createExplanationCard: () => mocks.card }));
-vi.mock('./selection-utils', () => ({ readSelection: mocks.read, sameSelection: () => false }));
+vi.mock('./selection-utils', () => ({ readSelection: mocks.read, sameSelection: () => false, isEditable: () => false }));
 import { startExplanationController } from './explanation-controller';
 
 let cleanup: (() => void) | undefined;
@@ -43,7 +43,8 @@ async function complete() {
 it('does not explain without an active provider', async () => {
   setup(false);
   await complete();
-  expect(mocks.card.show).not.toHaveBeenCalled();
+  expect(mocks.card.show).toHaveBeenCalled();
+  expect(mocks.card.setError).toHaveBeenCalledWith('Choose a provider and model in extension settings.');
   expect(mocks.send.mock.calls.some(([message]) => message.type === 'EXPLAIN_TEXT')).toBe(false);
 });
 
@@ -73,4 +74,25 @@ it('shows a friendly failure returned by the service worker', async () => {
   mocks.send.mockResolvedValue({ error: 'The extension connection was interrupted.' });
   await complete();
   expect(mocks.card.setError).toHaveBeenCalledWith('The extension connection was interrupted.');
+});
+
+it('shows processing before a slow settings lookup completes', async () => {
+  setup();
+  mocks.send.mockImplementation(() => new Promise<never>(() => {}));
+  await complete();
+  expect(mocks.card.show).toHaveBeenCalledOnce();
+});
+
+it('recovers when startup settings were unavailable', async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal('chrome', { runtime: { onMessage: { addListener: vi.fn(), removeListener: vi.fn() } } });
+  mocks.read.mockReturnValue({ text: 'Text', anchor: new DOMRect(20, 20, 100, 20), range: document.createRange() });
+  mocks.send.mockResolvedValueOnce({ error: 'Worker starting' });
+  mocks.send.mockImplementation(async (message: { type: string }) => message.type === 'GET_SETTINGS_STATUS'
+    ? { status: { configured: true, enabled: true, providerName: 'Saved provider', model: 'model' } }
+    : { content: 'Explanation' });
+  cleanup = startExplanationController();
+  await complete();
+  expect(mocks.card.setProvider).toHaveBeenCalledWith('Saved provider', 'model');
+  expect(mocks.card.setContent).toHaveBeenCalledWith('Explanation');
 });
